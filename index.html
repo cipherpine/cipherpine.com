@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0f0d" />
+
+  <title>Cipher Pine — From signal to software.</title>
+  <meta name="description" content="Cipher Pine is a North Carolina studio building AI-native tools, apps, and games. Built with signal-grade discipline." />
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://cipherpine.com/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Cipher Pine" />
+  <meta property="og:title" content="Cipher Pine — From signal to software." />
+  <meta property="og:description" content="A North Carolina studio building AI-native tools, apps, and games. Built with signal-grade discipline." />
+  <meta property="og:url" content="https://cipherpine.com/" />
+  <meta property="og:image" content="https://cipherpine.com/assets/og-image.png" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@cipher_pine" />
+  <meta name="twitter:title" content="Cipher Pine — From signal to software." />
+  <meta name="twitter:description" content="A North Carolina studio building AI-native tools, apps, and games." />
+  <meta name="twitter:image" content="https://cipherpine.com/assets/og-image.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
+
+  <style>
+    /* ---------- design tokens ---------- */
+    :root {
+      --bg:            #0a0f0d;
+      --bg-soft:       #0d1411;
+      --surface:       #131a16;
+      --elevated:      #1a221d;
+      --border:        #1f2a24;
+      --border-strong: #2a3a32;
+
+      --pine:          #2d7a4f;
+      --pine-deep:     #1e4d2b;
+      --pine-glow:     rgba(45, 122, 79, 0.18);
+
+      --cardinal:      #c41e3a;
+      --cardinal-soft: #e8253f;
+      --cardinal-glow: rgba(196, 30, 58, 0.22);
+
+      --ink:           #e8eae8;
+      --ink-soft:      #b8c0bb;
+      --ink-muted:     #8a948e;
+      --ink-faint:     #54605a;
+
+      --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+
+      --maxw: 1080px;
+      --pad-x: clamp(20px, 4vw, 48px);
+    }
+
+    /* ---------- reset & base ---------- */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    a { color: inherit; text-decoration: none; }
+    img, svg { display: block; max-width: 100%; }
+    button { font: inherit; cursor: pointer; }
+
+    /* subtle ambient background — grid lines + radial glow */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(ellipse at 50% -10%, var(--pine-glow), transparent 60%),
+        radial-gradient(ellipse at 90% 110%, var(--cardinal-glow), transparent 55%),
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: auto, auto, 60px 60px, 60px 60px;
+      mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
+      opacity: 0.55;
+      z-index: 0;
+    }
+
+    /* container */
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding-inline: var(--pad-x);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---------- nav ---------- */
+    nav.site {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: rgba(10, 15, 13, 0.65);
+      border-bottom: 1px solid var(--border);
+    }
+    nav.site .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-block: 18px;
+    }
+    nav.site .mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+    }
+    nav.site .mark .chev { color: var(--cardinal); }
+    nav.site .mark .name { color: var(--ink); }
+    nav.site .mark .cursor {
+      width: 8px; height: 16px;
+      background: var(--cardinal);
+      display: inline-block;
+      margin-left: 2px;
+      animation: blink 1.1s steps(2, start) infinite;
+    }
+    nav.site .links {
+      display: flex; gap: 28px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+    nav.site .links a:hover { color: var(--ink); }
+    @media (max-width: 600px) {
+      nav.site .links { display: none; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0; }
+    }
+
+    /* ---------- hero ---------- */
+    .hero {
+      padding-top: clamp(64px, 12vh, 140px);
+      padding-bottom: clamp(64px, 10vh, 120px);
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      background: var(--surface);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      color: var(--ink-soft);
+      margin-bottom: 32px;
+    }
+    .status .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--pine);
+      box-shadow: 0 0 0 0 var(--pine);
+      animation: pulse 2.2s ease-out infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(45, 122, 79, 0.55); }
+      80%  { box-shadow: 0 0 0 10px rgba(45, 122, 79, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(45, 122, 79, 0); }
+    }
+
+    h1.wordmark {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(40px, 9vw, 96px);
+      line-height: 1;
+      letter-spacing: 0.5px;
+      margin: 0 0 28px 0;
+      color: var(--ink);
+    }
+    h1.wordmark .chev { color: var(--cardinal); }
+    h1.wordmark .cursor {
+      display: inline-block;
+      width: 0.55ch;
+      background: var(--cardinal);
+      vertical-align: text-bottom;
+      height: 0.85em;
+      margin-left: 0.1ch;
+      animation: blink 1.1s steps(2, start) infinite;
+    }
+
+    .tagline {
+      font-family: var(--mono);
+      font-size: clamp(15px, 1.8vw, 18px);
+      color: var(--pine);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin: 0 0 28px 0;
+    }
+    .lead {
+      font-size: clamp(17px, 1.7vw, 20px);
+      color: var(--ink-soft);
+      max-width: 56ch;
+      margin: 0 0 40px 0;
+    }
+    .lead em { color: var(--ink); font-style: normal; font-weight: 500; }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 22px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--cardinal);
+      color: #fff;
+      border-color: var(--cardinal);
+    }
+    .btn-primary:hover { background: var(--cardinal-soft); transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--border-strong);
+    }
+    .btn-ghost:hover { border-color: var(--pine); color: var(--pine); }
+    .btn .arr { transition: transform 0.15s ease; }
+    .btn:hover .arr { transform: translateX(3px); }
+
+    /* ---------- sections shared ---------- */
+    section.block {
+      padding-block: clamp(56px, 10vh, 110px);
+      border-top: 1px solid var(--border);
+    }
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cardinal);
+      margin: 0 0 16px 0;
+    }
+    h2.section-title {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(26px, 3.6vw, 40px);
+      line-height: 1.15;
+      margin: 0 0 24px 0;
+      color: var(--ink);
+    }
+    .section-intro {
+      max-width: 60ch;
+      color: var(--ink-soft);
+      font-size: clamp(15px, 1.4vw, 17px);
+      margin: 0 0 48px 0;
+    }
+
+    /* ---------- what-we-build cards ---------- */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+    }
+    .card:hover {
+      border-color: var(--pine);
+      background: var(--elevated);
+      transform: translateY(-2px);
+    }
+    .card .marker {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--cardinal);
+      letter-spacing: 1.5px;
+      margin-bottom: 16px;
+    }
+    .card h3 {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 20px;
+      margin: 0 0 12px 0;
+      color: var(--ink);
+    }
+    .card p {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ---------- contact ---------- */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 32px;
+      margin-bottom: 40px;
+    }
+    .contact-item .label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 8px;
+    }
+    .contact-item .value {
+      font-family: var(--mono);
+      font-size: 16px;
+      color: var(--ink);
+    }
+    .contact-item a.value:hover { color: var(--cardinal); }
+
+    /* ---------- footer ---------- */
+    footer.site {
+      border-top: 1px solid var(--border);
+      padding-block: 32px;
+      margin-top: 32px;
+      color: var(--ink-muted);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    footer.site .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 32px;
+      justify-content: space-between;
+      align-items: center;
+    }
+    footer.site .meta { display: flex; gap: 18px; flex-wrap: wrap; }
+    footer.site .meta span { color: var(--ink-faint); }
+    footer.site .social {
+      display: flex;
+      gap: 18px;
+    }
+    footer.site .social a {
+      color: var(--ink-muted);
+      transition: color 0.15s ease;
+    }
+    footer.site .social a:hover { color: var(--cardinal); }
+
+    /* ---------- a11y / motion ---------- */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* selection */
+    ::selection { background: var(--cardinal); color: #fff; }
+
+    /* skip link */
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 16px; top: 16px; background: var(--cardinal); color: #fff; padding: 8px 12px; border-radius: 6px; z-index: 100; }
+  </style>
+</head>
+
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <nav class="site" aria-label="Primary">
+    <div class="wrap row">
+      <a class="mark" href="/" aria-label="Cipher Pine home">
+        <span class="chev">&gt;</span><span class="name">cipher pine</span><span class="cursor" aria-hidden="true"></span>
+      </a>
+      <div class="links">
+        <a href="#what">What we build</a>
+        <a href="#contact">Contact</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="wrap">
+        <div class="status" role="status">
+          <span class="dot" aria-hidden="true"></span>
+          <span>Operational &middot; Pre-launch</span>
+        </div>
+
+        <h1 class="wordmark">
+          <span class="chev">&gt;</span> cipher pine<span class="cursor" aria-hidden="true"></span>
+        </h1>
+
+        <p class="tagline">From signal to software.</p>
+
+        <p class="lead">
+          Cipher Pine is a North Carolina studio building <em>AI&#8209;native tools, apps, and games</em>.
+          Quiet operations. Disciplined builds. A trustworthy stack &mdash; from the dashboard
+          to the deploy pipeline.
+        </p>
+
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#contact">
+            Get in touch <span class="arr" aria-hidden="true">&rarr;</span>
+          </a>
+          <a class="btn btn-ghost" href="#what">
+            What we build
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- WHAT WE BUILD -->
+    <section class="block" id="what">
+      <div class="wrap">
+        <p class="eyebrow">// What we build</p>
+        <h2 class="section-title">Three product surfaces, one operating discipline.</h2>
+        <p class="section-intro">
+          We design and ship across three lanes &mdash; all sharing the same standards for
+          security, observability, and craft.
+        </p>
+
+        <div class="cards">
+          <article class="card">
+            <div class="marker">01 &mdash; Tools</div>
+            <h3>AI tools &amp; dashboards</h3>
+            <p>
+              Agent observability, workflow tooling, and operator dashboards for teams running
+              on LLMs. Built for clarity under load.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="marker">02 &mdash; Apps</div>
+            <h3>Focused applications</h3>
+            <p>
+              Desktop, mobile, and web applications that do one thing well. Apple, Google, and
+              the open web are all on the table.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="marker">03 &mdash; Games</div>
+            <h3>Original games</h3>
+            <p>
+              Independent games shipped to Steam, the App Store, and Google Play. Small scope,
+              high polish, repeatable craft.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="block" id="contact">
+      <div class="wrap">
+        <p class="eyebrow">// Contact</p>
+        <h2 class="section-title">Open channel.</h2>
+        <p class="section-intro">
+          Partnership, press, or product questions &mdash; pick the channel that fits. We
+          respond inside two business days.
+        </p>
+
+        <div class="contact-grid">
+          <div class="contact-item">
+            <div class="label">Email</div>
+            <a class="value" href="mailto:hello@cipherpine.com">hello@cipherpine.com</a>
+          </div>
+          <div class="contact-item">
+            <div class="label">Location</div>
+            <div class="value">Raleigh, North Carolina</div>
+          </div>
+          <div class="contact-item">
+            <div class="label">Founded</div>
+            <div class="value">2026</div>
+          </div>
+          <div class="contact-item">
+            <div class="label">Entity</div>
+            <div class="value">Cipher Pine LLC</div>
+          </div>
+        </div>
+
+        <a class="btn btn-primary" href="mailto:hello@cipherpine.com">
+          Start a conversation <span class="arr" aria-hidden="true">&rarr;</span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap row">
+      <div class="meta">
+        <span>&copy; <span id="year">2026</span> Cipher Pine LLC</span>
+        <span>Veteran&#8209;owned &middot; Built in North Carolina</span>
+      </div>
+      <div class="social" aria-label="Social links">
+        <a href="https://x.com/cipher_pine" target="_blank" rel="noopener noreferrer">X / @cipher_pine</a>
+        <a href="https://github.com/cipherpine" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // keep footer year fresh
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
