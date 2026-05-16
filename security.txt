@@ -1,0 +1,14 @@
+# Security policy for Cipher Pine LLC
+# https://cipherpine.com
+
+# Where to report a security issue
+Contact: mailto:hello@cipherpine.com
+
+# This file expires 2027-05-14. Rotate before then or scanners will warn.
+Expires: 2027-05-14T23:59:59Z
+
+# Preferred language for security reports
+Preferred-Languages: en
+
+# Canonical location of this file
+Canonical: https://cipherpine.com/.well-known/security.txt
