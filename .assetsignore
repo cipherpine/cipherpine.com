@@ -1,0 +1,8 @@
+# Files NOT to serve as public assets via Cloudflare Workers.
+# Pattern syntax is similar to .gitignore.
+
+# Deploy infrastructure — these belong in the repo but should never be at a public URL.
+wrangler.toml
+.github/**
+.gitignore
+.assetsignore

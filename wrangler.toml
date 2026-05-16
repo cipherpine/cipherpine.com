@@ -1,0 +1,15 @@
+# Cloudflare Workers Assets config for the Cipher Pine marketing site.
+# The Worker is named "cipherpineweb" (already exists in the account with
+# cipherpine.com + www.cipherpine.com bound as custom domains). This config
+# lets `wrangler deploy` (run by GitHub Actions on push to main) ship the
+# contents of this folder to that Worker as static assets.
+
+name = "cipherpineweb"
+compatibility_date = "2026-05-15"
+
+# Serve everything in this directory as static assets at the corresponding URL paths.
+# /index.html → /, /404.html → not-found fallback, /assets/* → /assets/*, etc.
+[assets]
+directory = "."
+not_found_handling = "404-page"
+html_handling = "auto-trailing-slash"
