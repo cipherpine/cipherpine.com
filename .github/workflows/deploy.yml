@@ -25,4 +25,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --keep-vars
+          # Pin to a recent wrangler that supports modern [assets] fields
+          # (not_found_handling, html_handling). 3.90.0 — the action's default
+          # — is too old and fails silently with exit 1.
+          wranglerVersion: "4"
+          command: deploy
