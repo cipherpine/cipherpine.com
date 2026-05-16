@@ -5,11 +5,13 @@
 # contents of this folder to that Worker as static assets.
 
 name = "cipherpineweb"
+main = "src/worker.js"
 compatibility_date = "2026-05-15"
 
 # Serve everything in this directory as static assets at the corresponding URL paths.
-# /index.html → /, /404.html → not-found fallback, /assets/* → /assets/*, etc.
+# Files listed in .assetsignore are excluded. /index.html → /, /404.html → fallback.
 [assets]
 directory = "."
+binding = "ASSETS"
 not_found_handling = "404-page"
 html_handling = "auto-trailing-slash"

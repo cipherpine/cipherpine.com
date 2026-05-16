@@ -16,17 +16,36 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Deploy ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+
+    # Pass Cloudflare creds to every step. The wrangler CLI picks these up
+    # automatically from the standard env var names.
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Force wrangler to be verbose so failures surface a real error
+      # (the cloudflare/wrangler-action wrapper was eating stderr).
+      WRANGLER_LOG: debug
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy to Cloudflare Workers (Assets)
-        uses: cloudflare/wrangler-action@v3
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Pin to a recent wrangler that supports modern [assets] fields
-          # (not_found_handling, html_handling). 3.90.0 — the action's default
-          # — is too old and fails silently with exit 1.
-          wranglerVersion: "4"
-          command: deploy
+          node-version: "20"
+
+      - name: Show repo layout
+        run: |
+          echo "--- working tree ---"
+          ls -la
+          echo "--- wrangler.toml ---"
+          cat wrangler.toml
+          echo "--- src/worker.js ---"
+          cat src/worker.js
+
+      - name: Verify Cloudflare auth (whoami)
+        run: npx --yes wrangler@4 whoami
+
+      - name: Deploy
+        run: npx --yes wrangler@4 deploy

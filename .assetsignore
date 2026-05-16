@@ -6,3 +6,4 @@ wrangler.toml
 .github/**
 .gitignore
 .assetsignore
+src/**
