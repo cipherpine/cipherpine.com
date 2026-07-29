@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0a0f0d" />
 
   <title>Cipher Pine — From signal to software.</title>
-  <meta name="description" content="Cipher Pine is a North Carolina studio building AI-native tools, apps, and games. Built with signal-grade discipline." />
+  <meta name="description" content="Cipher Pine is a North Carolina studio building AI-native tools, apps, and games. Makers of QuotaPane, an open-source Claude and Codex quota monitor. Built with signal-grade discipline." />
 
   <!-- Canonical -->
   <link rel="canonical" href="https://cipherpine.com/" />
@@ -15,7 +15,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Cipher Pine" />
   <meta property="og:title" content="Cipher Pine — From signal to software." />
-  <meta property="og:description" content="A North Carolina studio building AI-native tools, apps, and games. Built with signal-grade discipline." />
+  <meta property="og:description" content="A North Carolina studio building AI-native tools, apps, and games. Makers of QuotaPane, an open-source Claude and Codex quota monitor." />
   <meta property="og:url" content="https://cipherpine.com/" />
   <meta property="og:image" content="https://cipherpine.com/assets/og-image.png" />
 
@@ -23,7 +23,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:site" content="@cipher_pine" />
   <meta name="twitter:title" content="Cipher Pine — From signal to software." />
-  <meta name="twitter:description" content="A North Carolina studio building AI-native tools, apps, and games." />
+  <meta name="twitter:description" content="A North Carolina studio building AI-native tools, apps, and games. Makers of QuotaPane." />
   <meta name="twitter:image" content="https://cipherpine.com/assets/og-image.png" />
 
   <!-- Favicon -->
@@ -329,6 +329,40 @@
       line-height: 1.6;
     }
 
+    /* ---------- product / repo ---------- */
+    .specs {
+      list-style: none;
+      margin: 0 0 40px 0;
+      padding: 0;
+      display: grid;
+      gap: 16px;
+      max-width: 68ch;
+    }
+    .specs li {
+      color: var(--ink-soft);
+      font-size: 15px;
+      line-height: 1.6;
+      padding-left: 18px;
+      border-left: 1px solid var(--border-strong);
+    }
+    .specs .k {
+      display: block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--pine);
+      margin-bottom: 5px;
+    }
+    .repo-meta {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-muted);
+      margin: 28px 0 0 0;
+      word-break: break-word;
+    }
+    .repo-meta .chev { color: var(--cardinal); }
+
     /* ---------- contact ---------- */
     .contact-grid {
       display: grid;
@@ -406,6 +440,7 @@
         <span class="chev">&gt;</span><span class="name">cipher pine</span><span class="cursor" aria-hidden="true"></span>
       </a>
       <div class="links">
+        <a href="#quotapane">QuotaPane</a>
         <a href="#what">What we build</a>
         <a href="#contact">Contact</a>
       </div>
@@ -418,7 +453,7 @@
       <div class="wrap">
         <div class="status" role="status">
           <span class="dot" aria-hidden="true"></span>
-          <span>Operational &middot; Pre-launch</span>
+          <span>Operational &middot; QuotaPane is live</span>
         </div>
 
         <h1 class="wordmark">
@@ -434,13 +469,63 @@
         </p>
 
         <div class="cta-row">
-          <a class="btn btn-primary" href="#contact">
-            Get in touch <span class="arr" aria-hidden="true">&rarr;</span>
+          <a class="btn btn-primary" href="#quotapane">
+            See QuotaPane <span class="arr" aria-hidden="true">&rarr;</span>
           </a>
-          <a class="btn btn-ghost" href="#what">
-            What we build
+          <a class="btn btn-ghost" href="#contact">
+            Get in touch
           </a>
         </div>
+      </div>
+    </section>
+
+    <!-- SHIPPING NOW -->
+    <section class="block" id="quotapane">
+      <div class="wrap">
+        <p class="eyebrow">// Shipping now</p>
+        <h2 class="section-title">QuotaPane</h2>
+        <p class="section-intro">
+          A small, always&#8209;on&#8209;top desktop window that shows how much of your Claude and
+          Codex subscription quota you have left &mdash; read locally, from your own credentials,
+          with no account to create and nothing phoned home.
+        </p>
+
+        <ul class="specs">
+          <li>
+            <span class="k">Trust boundary</span>
+            Exactly two modules ever touch a credential or the network &mdash; deliberately small
+            enough to read end to end in one sitting.
+          </li>
+          <li>
+            <span class="k">Egress</span>
+            Deny&#8209;by&#8209;default through a single chokepoint, with a compile&#8209;time allowlist
+            of two hosts. Tests prove it on every push.
+          </li>
+          <li>
+            <span class="k">Telemetry</span>
+            None, of any kind, to anyone. No auto&#8209;update and no update check &mdash; there is
+            no updater in the codebase at all.
+          </li>
+          <li>
+            <span class="k">Open source</span>
+            Written in Rust. Signed releases with build attestation, verifiable from the artifact.
+            MIT&nbsp;OR&nbsp;Apache&#8209;2.0.
+          </li>
+        </ul>
+
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/cipherpine/quotapane" target="_blank" rel="noopener noreferrer">
+            Source on GitHub <span class="arr" aria-hidden="true">&rarr;</span>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/cipherpine/quotapane/releases/latest" target="_blank" rel="noopener noreferrer">
+            Download latest release
+          </a>
+        </div>
+
+        <p class="repo-meta">
+          <span class="chev" aria-hidden="true">&gt;</span>
+          github.com/cipherpine/quotapane &middot; Windows &amp; Linux &middot; MIT OR Apache&#8209;2.0
+        </p>
       </div>
     </section>
 
@@ -529,7 +614,8 @@
       </div>
       <div class="social" aria-label="Social links">
         <a href="https://x.com/cipher_pine" target="_blank" rel="noopener noreferrer">X / @cipher_pine</a>
-        <a href="https://github.com/cipherpine" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/cipherpine" target="_blank" rel="noopener noreferrer">GitHub / cipherpine</a>
+        <a href="https://github.com/cipherpine/quotapane" target="_blank" rel="noopener noreferrer">QuotaPane repo</a>
       </div>
     </div>
   </footer>
