@@ -80,23 +80,47 @@ jobs:
 
       - name: Verify production actually serves this commit
         # A green wrangler run is NOT proof the site changed — runs #1-#4 all
-        # ended without deploying anything. Compare the live homepage against
-        # the index.html in this commit and fail loudly if they differ.
+        # ended without uploading anything. Fetch the deployed homepage and
+        # compare it to the index.html in this commit.
         if: github.event_name != 'pull_request'
         run: |
           set -uo pipefail
           want=$(sha256sum index.html | cut -d' ' -f1)
           echo "expected sha256: $want"
+
+          # Always log the HTTP status and byte count: the first version of
+          # this step hid curl's failure behind `|| true` and reported a bare
+          # "sha none", which said nothing about why.
+          probe() {
+            code=$(curl -sS -L --max-time 20 -o probe.html -w '%{http_code}' \
+                   -A 'cipherpine-deploy-verify/1 (+https://github.com/cipherpine/cipherpine.com)' \
+                   -H 'Cache-Control: no-cache' "$2" || echo 000)
+            bytes=$(wc -c < probe.html 2>/dev/null || echo 0)
+            sha=$(sha256sum probe.html 2>/dev/null | cut -d' ' -f1 || echo none)
+            echo "$1: http=$code bytes=$bytes sha=$sha"
+            [ "$sha" = "$want" ]
+          }
+
+          # 1) Authoritative check — the Worker's own hostname is not behind the
+          #    zone's WAF or bot protection, so a datacenter curl can reach it.
+          ok=0
           for i in 1 2 3 4 5; do
-            curl -fsSL -H 'Cache-Control: no-cache' \
-              "https://cipherpine.com/?ci=${GITHUB_SHA}-$i" -o live.html || true
-            got=$(sha256sum live.html 2>/dev/null | cut -d' ' -f1 || echo none)
-            if [ "$got" = "$want" ]; then
-              echo "Live site matches this commit."
-              exit 0
+            if probe "worker attempt $i" \
+                 "https://cipherpineweb.justin-parsons937.workers.dev/?ci=${GITHUB_SHA}-$i"; then
+              ok=1; break
             fi
-            echo "attempt $i: live sha256 $got != $want — retrying in 10s"
             sleep 10
           done
-          echo "::error::wrangler exited 0 but https://cipherpine.com/ is not serving this commit's index.html."
-          exit 1
+          if [ "$ok" != 1 ]; then
+            echo "::error::wrangler exited 0 but the Worker is not serving this commit's index.html."
+            exit 1
+          fi
+          echo "Worker is serving this commit."
+
+          # 2) Custom domain — informational. Cloudflare bot protection may
+          #    refuse CI's IP, so a block here is a notice, not a failure.
+          if probe "cipherpine.com" "https://cipherpine.com/?ci=${GITHUB_SHA}-apex"; then
+            echo "cipherpine.com is serving this commit."
+          else
+            echo "::notice::Could not confirm cipherpine.com from CI (see http= above); the Worker check passed, so the deploy landed."
+          fi
