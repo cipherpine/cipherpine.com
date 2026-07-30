@@ -44,8 +44,30 @@ jobs:
           echo "--- src/worker.js ---"
           cat src/worker.js
 
+      - name: Check secrets are present
+        # Fail loudly here instead of letting wrangler swallow it.
+        # We never print the token itself, just its length, so this is safe to log.
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN secret is empty or missing."
+            echo "Add it at: https://github.com/cipherpine/cipherpine.com/settings/secrets/actions"
+            echo "The secret name must match EXACTLY (case-sensitive): CLOUDFLARE_API_TOKEN"
+            exit 1
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID secret is empty or missing."
+            exit 1
+          fi
+          echo "CLOUDFLARE_API_TOKEN: present (length=${#CLOUDFLARE_API_TOKEN})"
+          echo "CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID"
+
       - name: Verify Cloudflare auth (whoami)
-        run: npx --yes wrangler@4 whoami
+        # wrangler whoami exits 0 even when unauthenticated, so grep the output
+        # to actually fail the step if the token wasn't recognized.
+        run: |
+          set -o pipefail
+          npx --yes wrangler@4 whoami | tee whoami.out
+          grep -qE "You are logged in|account email" whoami.out
 
       - name: Deploy
         run: npx --yes wrangler@4 deploy
