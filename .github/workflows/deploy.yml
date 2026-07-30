@@ -20,7 +20,13 @@ jobs:
     # Pass Cloudflare creds to every step. The wrangler CLI picks these up
     # automatically from the standard env var names.
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Accept either secret name: the repo's original secret is called
+      # CLOUD_FLARE, which is why runs #1-#4 deployed nothing — wrangler saw
+      # an empty CLOUDFLARE_API_TOKEN and refused, while `whoami` still
+      # exited 0 and made the job look like it had authenticated.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUD_FLARE }}
+      # Optional: wrangler only needs this when the token can see more than
+      # one account. Left unset is fine.
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # Force wrangler to be verbose so failures surface a real error
       # (the cloudflare/wrangler-action wrapper was eating stderr).
@@ -49,17 +55,17 @@ jobs:
         # We never print the token itself, just its length, so this is safe to log.
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN secret is empty or missing."
+            echo "::error::No Cloudflare API token reached this job."
             echo "Add it at: https://github.com/cipherpine/cipherpine.com/settings/secrets/actions"
-            echo "The secret name must match EXACTLY (case-sensitive): CLOUDFLARE_API_TOKEN"
+            echo "Accepted secret names: CLOUDFLARE_API_TOKEN (preferred) or CLOUD_FLARE."
             exit 1
           fi
+          echo "Cloudflare API token: present (length=${#CLOUDFLARE_API_TOKEN})"
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::CLOUDFLARE_ACCOUNT_ID secret is empty or missing."
-            exit 1
+            echo "::notice::CLOUDFLARE_ACCOUNT_ID not set — fine while the token sees one account."
+          else
+            echo "CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID"
           fi
-          echo "CLOUDFLARE_API_TOKEN: present (length=${#CLOUDFLARE_API_TOKEN})"
-          echo "CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID"
 
       - name: Verify Cloudflare auth (whoami)
         # wrangler whoami exits 0 even when unauthenticated, so grep the output
@@ -71,3 +77,26 @@ jobs:
 
       - name: Deploy
         run: npx --yes wrangler@4 deploy
+
+      - name: Verify production actually serves this commit
+        # A green wrangler run is NOT proof the site changed — runs #1-#4 all
+        # ended without deploying anything. Compare the live homepage against
+        # the index.html in this commit and fail loudly if they differ.
+        if: github.event_name != 'pull_request'
+        run: |
+          set -uo pipefail
+          want=$(sha256sum index.html | cut -d' ' -f1)
+          echo "expected sha256: $want"
+          for i in 1 2 3 4 5; do
+            curl -fsSL -H 'Cache-Control: no-cache' \
+              "https://cipherpine.com/?ci=${GITHUB_SHA}-$i" -o live.html || true
+            got=$(sha256sum live.html 2>/dev/null | cut -d' ' -f1 || echo none)
+            if [ "$got" = "$want" ]; then
+              echo "Live site matches this commit."
+              exit 0
+            fi
+            echo "attempt $i: live sha256 $got != $want — retrying in 10s"
+            sleep 10
+          done
+          echo "::error::wrangler exited 0 but https://cipherpine.com/ is not serving this commit's index.html."
+          exit 1
