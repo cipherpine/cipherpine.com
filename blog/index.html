@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0f0d" />
+
+  <title>Blog — Cipher Pine</title>
+  <meta name="description" content="Field notes from Cipher Pine: engineering write-ups on AI tooling, quota systems, and building trustworthy software." />
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://cipherpine.com/blog/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Cipher Pine" />
+  <meta property="og:title" content="Blog — Cipher Pine" />
+  <meta property="og:description" content="Field notes from Cipher Pine: engineering write-ups on AI tooling, quota systems, and building trustworthy software." />
+  <meta property="og:url" content="https://cipherpine.com/blog/" />
+  <meta property="og:image" content="https://cipherpine.com/assets/og-image.png" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@cipher_pine" />
+  <meta name="twitter:title" content="Blog — Cipher Pine" />
+  <meta name="twitter:description" content="Field notes from Cipher Pine: engineering write-ups on AI tooling and trustworthy software." />
+  <meta name="twitter:image" content="https://cipherpine.com/assets/og-image.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
+
+  <style>
+    /* ---------- design tokens ---------- */
+    :root {
+      --bg:            #0a0f0d;
+      --bg-soft:       #0d1411;
+      --surface:       #131a16;
+      --elevated:      #1a221d;
+      --border:        #1f2a24;
+      --border-strong: #2a3a32;
+
+      --pine:          #2d7a4f;
+      --pine-deep:     #1e4d2b;
+      --pine-glow:     rgba(45, 122, 79, 0.18);
+
+      --cardinal:      #c41e3a;
+      --cardinal-soft: #e8253f;
+      --cardinal-glow: rgba(196, 30, 58, 0.22);
+
+      --ink:           #e8eae8;
+      --ink-soft:      #b8c0bb;
+      --ink-muted:     #8a948e;
+      --ink-faint:     #54605a;
+
+      --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+
+      --maxw: 1080px;
+      --pad-x: clamp(20px, 4vw, 48px);
+    }
+
+    /* ---------- reset & base ---------- */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    a { color: inherit; text-decoration: none; }
+    img, svg { display: block; max-width: 100%; }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(ellipse at 50% -10%, var(--pine-glow), transparent 60%),
+        radial-gradient(ellipse at 90% 110%, var(--cardinal-glow), transparent 55%),
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: auto, auto, 60px 60px, 60px 60px;
+      mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
+      opacity: 0.55;
+      z-index: 0;
+    }
+
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding-inline: var(--pad-x);
+      position: relative;
+      z-index: 1;
+      width: 100%;
+    }
+
+    /* ---------- nav ---------- */
+    nav.site {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: rgba(10, 15, 13, 0.65);
+      border-bottom: 1px solid var(--border);
+    }
+    nav.site .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-block: 18px;
+    }
+    nav.site .mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+    }
+    nav.site .mark .chev { color: var(--cardinal); }
+    nav.site .mark .name { color: var(--ink); }
+    nav.site .mark .cursor {
+      width: 8px; height: 16px;
+      background: var(--cardinal);
+      display: inline-block;
+      margin-left: 2px;
+      animation: blink 1.1s steps(2, start) infinite;
+    }
+    nav.site .links {
+      display: flex; gap: 28px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+    nav.site .links a:hover { color: var(--ink); }
+    nav.site .links a[aria-current] { color: var(--ink); }
+    @media (max-width: 600px) {
+      nav.site .links { display: none; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0; }
+    }
+
+    /* ---------- header ---------- */
+    main { flex: 1; }
+    .page-head {
+      padding-top: clamp(56px, 10vh, 120px);
+      padding-bottom: clamp(32px, 6vh, 64px);
+    }
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cardinal);
+      margin: 0 0 16px 0;
+    }
+    h1.page-title {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(32px, 5.5vw, 64px);
+      line-height: 1.1;
+      letter-spacing: 0.5px;
+      margin: 0 0 20px 0;
+      color: var(--ink);
+    }
+    h1.page-title .cursor {
+      display: inline-block;
+      width: 0.55ch;
+      background: var(--cardinal);
+      vertical-align: text-bottom;
+      height: 0.85em;
+      margin-left: 0.1ch;
+      animation: blink 1.1s steps(2, start) infinite;
+    }
+    .page-intro {
+      max-width: 58ch;
+      color: var(--ink-soft);
+      font-size: clamp(15px, 1.5vw, 17px);
+      margin: 0;
+    }
+
+    /* ---------- post list ---------- */
+    .posts {
+      padding-bottom: clamp(64px, 10vh, 120px);
+      display: grid;
+      gap: 16px;
+    }
+    .post-card {
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+    }
+    .post-card:hover {
+      border-color: var(--pine);
+      background: var(--elevated);
+      transform: translateY(-2px);
+    }
+    .post-card .meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--cardinal);
+      letter-spacing: 1.5px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+    }
+    .post-card .meta .dim { color: var(--ink-faint); }
+    .post-card h2 {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(19px, 2.2vw, 24px);
+      line-height: 1.3;
+      margin: 0 0 10px 0;
+      color: var(--ink);
+    }
+    .post-card p {
+      margin: 0 0 16px 0;
+      color: var(--ink-soft);
+      font-size: 15px;
+      line-height: 1.6;
+      max-width: 68ch;
+    }
+    .post-card .read {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.15s ease;
+    }
+    .post-card .read .arr { transition: transform 0.15s ease; }
+    .post-card:hover .read { color: var(--pine); }
+    .post-card:hover .read .arr { transform: translateX(3px); }
+
+    /* ---------- footer ---------- */
+    footer.site {
+      border-top: 1px solid var(--border);
+      padding-block: 32px;
+      color: var(--ink-muted);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    footer.site .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 32px;
+      justify-content: space-between;
+      align-items: center;
+    }
+    footer.site .meta { display: flex; gap: 18px; flex-wrap: wrap; }
+    footer.site .meta span { color: var(--ink-faint); }
+    footer.site .social { display: flex; gap: 18px; }
+    footer.site .social a { color: var(--ink-muted); transition: color 0.15s ease; }
+    footer.site .social a:hover { color: var(--cardinal); }
+
+    /* ---------- a11y / motion ---------- */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+    ::selection { background: var(--cardinal); color: #fff; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 16px; top: 16px; background: var(--cardinal); color: #fff; padding: 8px 12px; border-radius: 6px; z-index: 100; }
+  </style>
+</head>
+
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <nav class="site" aria-label="Primary">
+    <div class="wrap row">
+      <a class="mark" href="/" aria-label="Cipher Pine home">
+        <span class="chev">&gt;</span><span class="name">cipher pine</span><span class="cursor" aria-hidden="true"></span>
+      </a>
+      <div class="links">
+        <a href="/#quotapane">QuotaPane</a>
+        <a href="/#what">What we build</a>
+        <a href="/blog/" aria-current="page">Blog</a>
+        <a href="/#contact">Contact</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <header class="page-head">
+      <div class="wrap">
+        <p class="eyebrow">// Blog</p>
+        <h1 class="page-title">Field notes<span class="cursor" aria-hidden="true"></span></h1>
+        <p class="page-intro">
+          Engineering write-ups from the workbench &mdash; what we're building, what we've
+          reverse-engineered, and what we got wrong along the way.
+        </p>
+      </div>
+    </header>
+
+    <div class="wrap posts">
+      <a class="post-card" href="/blog/claude-usage-limits/">
+        <div class="meta">
+          <time datetime="2026-08-08">2026-08-08</time>
+          <span class="dim">&middot;</span>
+          <span>QuotaPane</span>
+          <span class="dim">&middot;</span>
+          <span class="dim">7 min read</span>
+        </div>
+        <h2>How Claude's usage limits actually work (notes from the undocumented API)</h2>
+        <p>
+          Where Claude Code's quota numbers really come from: the undocumented OAuth usage
+          endpoint, the 5-hour and 7-day windows, per-model weekly caps that no summary screen
+          shows &mdash; and why local usage trackers so often disagree with the real limit.
+        </p>
+        <span class="read">Read post <span class="arr" aria-hidden="true">&rarr;</span></span>
+      </a>
+    </div>
+  </main>
+
+  <footer class="site">
+    <div class="wrap row">
+      <div class="meta">
+        <span>&copy; <span id="year">2026</span> Cipher Pine LLC</span>
+        <span>Veteran&#8209;owned &middot; Built in North Carolina</span>
+      </div>
+      <div class="social" aria-label="Social links">
+        <a href="https://x.com/cipher_pine" target="_blank" rel="noopener noreferrer">X / @cipher_pine</a>
+        <a href="https://github.com/cipherpine" target="_blank" rel="noopener noreferrer">GitHub / cipherpine</a>
+        <a href="https://github.com/cipherpine/quotapane" target="_blank" rel="noopener noreferrer">QuotaPane repo</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // keep footer year fresh
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

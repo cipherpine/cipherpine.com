@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0f0d" />
+
+  <title>How Claude's usage limits actually work — Cipher Pine</title>
+  <meta name="description" content="Notes from the undocumented API: where Claude Code's quota numbers come from, per-model weekly limits, why local usage trackers disagree with the real limit, and what we built with it." />
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://cipherpine.com/blog/claude-usage-limits/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Cipher Pine" />
+  <meta property="og:title" content="How Claude's usage limits actually work" />
+  <meta property="og:description" content="Notes from the undocumented API: where the quota numbers live, what they mean, and why third-party usage trackers so often disagree with the real limit." />
+  <meta property="og:url" content="https://cipherpine.com/blog/claude-usage-limits/" />
+  <meta property="og:image" content="https://cipherpine.com/assets/og-image.png" />
+  <meta property="article:published_time" content="2026-08-08" />
+  <meta property="article:author" content="Justin" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@cipher_pine" />
+  <meta name="twitter:title" content="How Claude's usage limits actually work" />
+  <meta name="twitter:description" content="Notes from the undocumented API: where the quota numbers live, and why usage trackers disagree with the real limit." />
+  <meta name="twitter:image" content="https://cipherpine.com/assets/og-image.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "How Claude's usage limits actually work (notes from the undocumented API)",
+    "datePublished": "2026-08-08",
+    "author": { "@type": "Person", "name": "Justin" },
+    "publisher": { "@type": "Organization", "name": "Cipher Pine LLC", "url": "https://cipherpine.com/" },
+    "mainEntityOfPage": "https://cipherpine.com/blog/claude-usage-limits/"
+  }
+  </script>
+
+  <style>
+    /* ---------- design tokens ---------- */
+    :root {
+      --bg:            #0a0f0d;
+      --bg-soft:       #0d1411;
+      --surface:       #131a16;
+      --elevated:      #1a221d;
+      --border:        #1f2a24;
+      --border-strong: #2a3a32;
+
+      --pine:          #2d7a4f;
+      --pine-deep:     #1e4d2b;
+      --pine-glow:     rgba(45, 122, 79, 0.18);
+
+      --cardinal:      #c41e3a;
+      --cardinal-soft: #e8253f;
+      --cardinal-glow: rgba(196, 30, 58, 0.22);
+
+      --ink:           #e8eae8;
+      --ink-soft:      #b8c0bb;
+      --ink-muted:     #8a948e;
+      --ink-faint:     #54605a;
+
+      --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+
+      --maxw: 1080px;
+      --pad-x: clamp(20px, 4vw, 48px);
+    }
+
+    /* ---------- reset & base ---------- */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    a { color: inherit; text-decoration: none; }
+    img, svg { display: block; max-width: 100%; }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(ellipse at 50% -10%, var(--pine-glow), transparent 60%),
+        radial-gradient(ellipse at 90% 110%, var(--cardinal-glow), transparent 55%),
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: auto, auto, 60px 60px, 60px 60px;
+      mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 80%);
+      opacity: 0.55;
+      z-index: 0;
+    }
+
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding-inline: var(--pad-x);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---------- nav ---------- */
+    nav.site {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: rgba(10, 15, 13, 0.65);
+      border-bottom: 1px solid var(--border);
+    }
+    nav.site .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-block: 18px;
+    }
+    nav.site .mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+    }
+    nav.site .mark .chev { color: var(--cardinal); }
+    nav.site .mark .name { color: var(--ink); }
+    nav.site .mark .cursor {
+      width: 8px; height: 16px;
+      background: var(--cardinal);
+      display: inline-block;
+      margin-left: 2px;
+      animation: blink 1.1s steps(2, start) infinite;
+    }
+    nav.site .links {
+      display: flex; gap: 28px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+    nav.site .links a:hover { color: var(--ink); }
+    nav.site .links a[aria-current] { color: var(--ink); }
+    @media (max-width: 600px) {
+      nav.site .links { display: none; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0; }
+    }
+
+    /* ---------- article header ---------- */
+    .post-head {
+      padding-top: clamp(56px, 9vh, 110px);
+      padding-bottom: clamp(32px, 5vh, 56px);
+    }
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cardinal);
+      margin: 0 0 16px 0;
+    }
+    .eyebrow a:hover { color: var(--cardinal-soft); }
+    h1.post-title {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(28px, 4.6vw, 52px);
+      line-height: 1.12;
+      letter-spacing: 0.3px;
+      margin: 0 0 18px 0;
+      color: var(--ink);
+      max-width: 24ch;
+    }
+    .post-sub {
+      font-family: var(--mono);
+      font-size: clamp(14px, 1.6vw, 17px);
+      color: var(--pine);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin: 0 0 28px 0;
+    }
+    .post-meta {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      align-items: center;
+    }
+    .post-meta .chev { color: var(--cardinal); }
+    .post-meta .sep { color: var(--ink-faint); }
+
+    /* ---------- article body ---------- */
+    article.post {
+      padding-bottom: clamp(56px, 9vh, 100px);
+    }
+    .prose {
+      max-width: 72ch;
+    }
+    .prose p {
+      color: var(--ink-soft);
+      font-size: clamp(15.5px, 1.5vw, 17px);
+      line-height: 1.7;
+      margin: 0 0 22px 0;
+    }
+    .prose strong { color: var(--ink); font-weight: 600; }
+    .prose em { color: var(--ink); }
+    .prose a {
+      color: var(--ink);
+      border-bottom: 1px solid var(--border-strong);
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .prose a:hover { color: var(--cardinal-soft); border-color: var(--cardinal); }
+    .prose h2 {
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: clamp(20px, 2.4vw, 26px);
+      line-height: 1.25;
+      color: var(--ink);
+      margin: 48px 0 18px 0;
+    }
+    .prose h2::before {
+      content: '// ';
+      color: var(--cardinal);
+    }
+    .prose ul {
+      margin: 0 0 22px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .prose ul li {
+      color: var(--ink-soft);
+      font-size: clamp(15.5px, 1.5vw, 17px);
+      line-height: 1.7;
+      padding-left: 22px;
+      position: relative;
+      margin-bottom: 10px;
+    }
+    .prose ul li::before {
+      content: '>';
+      font-family: var(--mono);
+      color: var(--pine);
+      position: absolute;
+      left: 0;
+    }
+    .prose code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 2px 6px;
+      white-space: nowrap;
+    }
+    .prose pre {
+      font-family: var(--mono);
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      margin: 0 0 22px 0;
+      overflow-x: auto;
+    }
+    .prose pre code {
+      background: none;
+      border: 0;
+      padding: 0;
+      white-space: pre;
+      color: inherit;
+      font-size: inherit;
+    }
+    .prose pre .c-key  { color: var(--pine); }
+    .prose pre .c-str  { color: var(--ink); }
+    .prose pre .c-num  { color: var(--cardinal-soft); }
+    .prose .callout {
+      border-left: 2px solid var(--pine);
+      background: var(--bg-soft);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin: 0 0 22px 0;
+    }
+    .prose .callout p { margin: 0; }
+
+    /* ---------- post footer CTA ---------- */
+    .post-cta {
+      border-top: 1px solid var(--border);
+      margin-top: 48px;
+      padding-top: 40px;
+      max-width: 72ch;
+    }
+    .post-cta .k {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--pine);
+      margin: 0 0 10px 0;
+    }
+    .post-cta p {
+      color: var(--ink-soft);
+      margin: 0 0 24px 0;
+      max-width: 60ch;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 22px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--cardinal);
+      color: #fff;
+      border-color: var(--cardinal);
+    }
+    .btn-primary:hover { background: var(--cardinal-soft); transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--border-strong);
+    }
+    .btn-ghost:hover { border-color: var(--pine); color: var(--pine); }
+    .btn .arr { transition: transform 0.15s ease; }
+    .btn:hover .arr { transform: translateX(3px); }
+    .btn-ghost:hover .arr { transform: translateX(-3px); }
+
+    /* ---------- footer ---------- */
+    footer.site {
+      border-top: 1px solid var(--border);
+      padding-block: 32px;
+      margin-top: 32px;
+      color: var(--ink-muted);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    footer.site .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 32px;
+      justify-content: space-between;
+      align-items: center;
+    }
+    footer.site .meta { display: flex; gap: 18px; flex-wrap: wrap; }
+    footer.site .meta span { color: var(--ink-faint); }
+    footer.site .social { display: flex; gap: 18px; }
+    footer.site .social a { color: var(--ink-muted); transition: color 0.15s ease; }
+    footer.site .social a:hover { color: var(--cardinal); }
+
+    /* ---------- a11y / motion ---------- */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+    ::selection { background: var(--cardinal); color: #fff; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 16px; top: 16px; background: var(--cardinal); color: #fff; padding: 8px 12px; border-radius: 6px; z-index: 100; }
+  </style>
+</head>
+
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <nav class="site" aria-label="Primary">
+    <div class="wrap row">
+      <a class="mark" href="/" aria-label="Cipher Pine home">
+        <span class="chev">&gt;</span><span class="name">cipher pine</span><span class="cursor" aria-hidden="true"></span>
+      </a>
+      <div class="links">
+        <a href="/#quotapane">QuotaPane</a>
+        <a href="/#what">What we build</a>
+        <a href="/blog/" aria-current="section">Blog</a>
+        <a href="/#contact">Contact</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <article class="post">
+      <header class="post-head">
+        <div class="wrap">
+          <p class="eyebrow"><a href="/blog/">// Blog</a></p>
+          <h1 class="post-title">How Claude's usage limits actually work</h1>
+          <p class="post-sub">Notes from the undocumented API.</p>
+          <p class="post-meta">
+            <span><span class="chev" aria-hidden="true">&gt;</span> Justin</span>
+            <span class="sep" aria-hidden="true">&middot;</span>
+            <time datetime="2026-08-08">August 8, 2026</time>
+            <span class="sep" aria-hidden="true">&middot;</span>
+            <span>7 min read</span>
+          </p>
+        </div>
+      </header>
+
+      <div class="wrap">
+        <div class="prose">
+          <p>
+            If you use Claude Code on a subscription plan, you've probably hit the wall
+            mid-task: the 5-hour window runs out &mdash; or worse, the weekly one &mdash; and the
+            first you hear of it is the refusal. The obvious question &mdash; <em>how much do I
+            have left?</em> &mdash; turns out to have no well-documented answer. Anthropic doesn't
+            publish how the quota system works. But the official client has to get its numbers
+            from somewhere, and that somewhere is an ordinary HTTPS endpoint that answers
+            with JSON.
+          </p>
+          <p>
+            I've spent the last month building a quota monitor against that endpoint, so I've
+            read its responses more carefully than most people would want to. This post is what
+            I know: where the numbers live, what they mean, why third-party usage trackers so
+            often disagree with the real limit, and what the endpoint tells you that no UI
+            currently shows.
+          </p>
+
+          <h2 id="where-the-numbers-live">Where the numbers live</h2>
+          <p>When you run <code>/usage</code> inside Claude Code, the client calls:</p>
+          <pre><code>GET https://api.anthropic.com/api/oauth/usage
+Authorization: Bearer &lt;your OAuth token&gt;
+anthropic-beta: oauth-2025-04-20
+User-Agent: claude-code/&lt;version&gt;</code></pre>
+          <p>
+            The token is the one the Claude CLI already keeps on your machine &mdash; this is the
+            subscription-plan endpoint, not the API-key billing world. Two details matter if you
+            ever poke at it yourself:
+          </p>
+          <ul>
+            <li>The <code>anthropic-beta: oauth-2025-04-20</code> header is required.</li>
+            <li>
+              The <code>User-Agent</code> matters. Requests without a plausible
+              <code>claude-code/&lt;version&gt;</code> string land in an aggressively throttled
+              bucket. The endpoint is effectively saying: this is for the official client.
+            </li>
+          </ul>
+          <p>The response is small. The shape, with values from a synthetic fixture:</p>
+          <pre><code>{
+  <span class="c-key">"five_hour"</span>:  { <span class="c-key">"utilization"</span>: <span class="c-num">33.0</span>, <span class="c-key">"resets_at"</span>: <span class="c-str">"2026-04-11T07:00:00+00:00"</span> },
+  <span class="c-key">"seven_day"</span>:  { <span class="c-key">"utilization"</span>: <span class="c-num">80.0</span>, <span class="c-key">"resets_at"</span>: <span class="c-str">"2026-04-18T07:00:00+00:00"</span> },
+  <span class="c-key">"seven_day_opus"</span>:   <span class="c-num">null</span>,
+  <span class="c-key">"seven_day_sonnet"</span>: { <span class="c-key">"utilization"</span>: <span class="c-num">12.5</span>, <span class="c-key">"resets_at"</span>: <span class="c-num">null</span> },
+  <span class="c-key">"limits"</span>: [ ... ]
+}</code></pre>
+          <p>That's the heart of it. Two things are worth noticing.</p>
+          <p>
+            <strong><code>utilization</code> is the server's number.</strong> It's a percentage
+            computed by Anthropic, not a token count you're expected to tally yourself. Nobody
+            outside Anthropic knows the exact formula (it clearly isn't raw token count &mdash;
+            model, cache hits, and other factors weigh in). Every tool that shows you a
+            percentage either reports this number or is guessing.
+          </p>
+          <p>
+            <strong><code>resets_at</code> is nullable.</strong> A window you haven't touched may
+            carry no reset time at all, because nothing is running down yet. Any tool that
+            assumes it's always there breaks on quiet accounts.
+          </p>
+
+          <h2 id="the-windows">The windows: 5-hour, 7-day, and per-model</h2>
+          <p>
+            The two headline windows are what you'd expect from Anthropic's own plan
+            descriptions: a rolling ~5-hour &ldquo;session&rdquo; window and a 7-day weekly
+            window. Both drain as you use Claude &mdash; on any surface &mdash; and each resets
+            on its own clock.
+          </p>
+          <p>
+            The more interesting part arrived mid-2026: a generalized <code>limits</code> array
+            that the older fields now duplicate. Each entry carries a <code>kind</code>
+            (session-shaped kinds map to the 5-hour window; weekly kinds to the 7-day one) and
+            an optional <code>scope</code>. An unscoped entry restates the headline windows. A
+            scoped one carries <code>scope.model.display_name</code> &mdash; which is how
+            <strong>per-model weekly quotas</strong> surface. If your plan has a model with its
+            own weekly budget, this array is the only place that number exists. The legacy
+            <code>seven_day_opus</code> / <code>seven_day_sonnet</code> fields are the older,
+            hard-coded version of the same idea, and they're nullable because most plans don't
+            populate them anymore.
+          </p>
+          <div class="callout">
+            <p>
+              Practical consequence: <strong>you can hit a limit that no summary screen shows
+              you.</strong> I've tripped a per-model weekly cap while the headline weekly window
+              sat far from full. If your tooling only reads the two headline numbers, that
+              failure looks like a bug. It isn't &mdash; it's a scoped entry in an array most
+              tools don't parse.
+            </p>
+          </div>
+
+          <h2 id="why-trackers-disagree">Why your usage tracker disagrees with Claude</h2>
+          <p>
+            The most popular Claude usage tools work a completely different way: they parse the
+            JSONL transcript files Claude Code writes under <code>~/.claude/projects/</code> and
+            add up tokens locally. That approach produces useful analytics &mdash; per-project
+            breakdowns, historical cost estimates &mdash; but as a <em>limit</em> gauge it has a
+            structural blind spot, and the issue trackers show users hitting it constantly (the
+            most-starred tool in the space has an issue literally titled &ldquo;shows normal
+            usage, but limit is reached in claude. Why it is misleading?&rdquo;).
+          </p>
+          <p>Local logs only see <em>this machine, this client</em>. They don't see:</p>
+          <ul>
+            <li>anything you did on claude.ai in the browser,</li>
+            <li>Claude Code running on your other machine,</li>
+            <li>other clients or surfaces tied to the same account.</li>
+          </ul>
+          <p>
+            The server's utilization number counts all of it. So a local tally can read 40%
+            while the real window is exhausted &mdash; and no amount of parsing more carefully
+            will fix that, because the missing usage never touched the local disk. The two
+            approaches answer different questions. Local logs answer <em>&ldquo;what did this
+            machine spend?&rdquo;</em> The OAuth endpoint answers <em>&ldquo;what will Anthropic
+            let me do next?&rdquo;</em> If you care about the second question, only the server's
+            number is truth.
+          </p>
+
+          <h2 id="incoherent-numbers">When the server's numbers disagree with themselves</h2>
+          <p>
+            Honesty requires the next paragraph: the server's numbers are the
+            <em>authority</em>, but they are not always <em>coherent</em>. Anthropic's own issue
+            tracker currently has open reports of a daily/session limit exhausting while the
+            weekly window shows a third used, weekly counters that reset on something like a
+            24-hour cycle, and reset times that don't match the plan's documentation.
+            Client-side, you can't fix any of that &mdash; the honest move is to display what
+            the endpoint said and <em>when it said it</em>, so at least the staleness and the
+            contradiction are visible instead of laundered into a confident-looking bar.
+          </p>
+
+          <h2 id="the-codex-side">The Codex side, briefly</h2>
+          <p>
+            OpenAI's Codex CLI has the same shape of story with different details. The usage
+            endpoint lives at <code>https://chatgpt.com/backend-api/wham/usage</code> &mdash;
+            note the host: <strong>chatgpt.com, not api.openai.com</strong> &mdash; because
+            subscription-plan usage belongs to the ChatGPT backend, not the developer platform.
+            The response carries a <code>rate_limit</code> object with
+            <code>primary_window</code> and <code>secondary_window</code>, each self-describing:
+          </p>
+          <pre><code>{ <span class="c-key">"used_percent"</span>: <span class="c-num">25</span>, <span class="c-key">"limit_window_seconds"</span>: <span class="c-num">18000</span>, <span class="c-key">"reset_after_seconds"</span>: <span class="c-num">3600</span> }</code></pre>
+          <p>
+            The windows aren't named &mdash; they're <em>sized</em>. 18000 seconds is your
+            5-hour window; 604800 is the weekly one. There's also an
+            <code>additional_rate_limits</code> array (per-model limits, named by
+            <code>limit_name</code>), and a credits mechanism the UI surfaces as &ldquo;resets
+            available&rdquo; &mdash; a limited ability to reset a window early.
+          </p>
+
+          <h2 id="what-i-built">What I built with all this</h2>
+          <p>
+            I wanted the server's numbers on screen at all times &mdash; not a dashboard to
+            open, not a command to run, just a small always-on-top window that's there when the
+            number starts to matter. So I built
+            <a href="https://github.com/cipherpine/quotapane" target="_blank" rel="noopener noreferrer">QuotaPane</a>:
+            a ~320px Rust window (Windows first; macOS/Linux build from source) showing both
+            providers' windows as bars with reset countdowns, pace markers, and opt-in history
+            sparklines, plus a headless CLI with <code>--json</code> and a
+            <code>--fail-at &lt;N&gt;</code> flag that exits non-zero so scripts can gate long
+            agent runs on remaining quota. It recently grew a second view that lists the Claude
+            Code / Codex sessions running on your machine and whether each is working or waiting
+            on you &mdash; derived from log metadata only, never message content.
+          </p>
+          <p>
+            Because a tool like this reads your credential files, the trust design is the actual
+            product: read-only credentials, egress hard-allowlisted to exactly the two provider
+            hosts, no telemetry &mdash; and those claims are numbered invariants machine-checked
+            in CI against named tests on every push, not promises in a README. If the docs drift
+            from the code, the build goes red. The whole sensitive surface is two small modules
+            you can read in one sitting.
+          </p>
+          <p>
+            The result is a persistent, always-on-top view of where I stand with each
+            subscription. It lets me load-balance across subscriptions and models, always know
+            where the 5-hour and weekly windows sit, and plan work across every active project
+            against what's actually left &mdash; instead of finding out at the refusal.
+          </p>
+
+          <h2 id="caveats">Caveats</h2>
+          <p>
+            Both endpoints are undocumented. Either vendor can change or break them without
+            notice, and when that happens, honest tooling should say &ldquo;stale&rdquo; or
+            &ldquo;broken&rdquo; rather than guess. Requests to the Claude endpoint present as
+            the official client because the endpoint throttles anything else &mdash; you should
+            know that's how every third-party tool in this space works, mine included. And
+            everything here reads <em>your own</em> credentials, locally; nothing about your
+            account leaves your machine that wasn't already going to the vendor.
+          </p>
+          <p>
+            If you've observed endpoint behavior that contradicts anything above, I'd like to
+            hear it &mdash; the repo's
+            <a href="https://github.com/cipherpine/quotapane/issues" target="_blank" rel="noopener noreferrer">issues are open</a>,
+            and this post gets corrected, not defended.
+          </p>
+        </div>
+
+        <div class="post-cta">
+          <p class="k">// Try it</p>
+          <p>
+            QuotaPane puts both providers' real quota numbers in a small always-on-top window
+            &mdash; open source, no telemetry, no account.
+          </p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="https://github.com/cipherpine/quotapane" target="_blank" rel="noopener noreferrer">
+              Source on GitHub <span class="arr" aria-hidden="true">&rarr;</span>
+            </a>
+            <a class="btn btn-ghost" href="/blog/">
+              <span class="arr" aria-hidden="true">&larr;</span> All posts
+            </a>
+          </div>
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site">
+    <div class="wrap row">
+      <div class="meta">
+        <span>&copy; <span id="year">2026</span> Cipher Pine LLC</span>
+        <span>Veteran&#8209;owned &middot; Built in North Carolina</span>
+      </div>
+      <div class="social" aria-label="Social links">
+        <a href="https://x.com/cipher_pine" target="_blank" rel="noopener noreferrer">X / @cipher_pine</a>
+        <a href="https://github.com/cipherpine" target="_blank" rel="noopener noreferrer">GitHub / cipherpine</a>
+        <a href="https://github.com/cipherpine/quotapane" target="_blank" rel="noopener noreferrer">QuotaPane repo</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // keep footer year fresh
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
